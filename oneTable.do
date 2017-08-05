@@ -1,33 +1,5 @@
-*program define fixBinary, rclass
-*	return numCols, numRows, firstCat, secondCat
-*end;
-
-program define fixBinary
-	syntax varlist(max=2 min=2 numeric) [if] [in], num(real)
-	
-	local new = "`1'"
-	local old = "`2'"
-
-	capture lab drop label`num'
-	
-	levelsof `new', local(numNew)
-	levelsof `old', local(numOld)
-	tokenize `numOld'
-	local cmd = "lab def label`num'"
-	foreach i of local numNew {
-		local a : value label `old'
-		local lab : label `a' `=`i'-1'
-		di "aaa`lab'"
-		local cmd = `"`cmd' `i' "`lab'""'
-	}
-	`cmd'
-	lab val `new' label`num'
-	tab `new'
-	tab `old'
-end;
-
-program define twoByTwo 
-	syntax varlist(max=2 numeric) [if] [in], mean(varlist) footnote(string) title(string) name(string)
+program oneTable 
+	syntax varlist(max=1 numeric) [if] [in], mean(varlist) footnote(string) title(string) name(string)
 	
 	*Check the sample and make sure it's not N=0
 	*quietly {
@@ -35,25 +7,28 @@ program define twoByTwo
 	markout `touse' `by', strok
 	count if `touse'
 	if r(N)==0 error 2000
-	
-	local numCat : word count `varlist'
-	
+		
 	tokenize `varlist'
-	
-	local firstCat = "`1'"	
+	local firstCat = "`1'"
 	summ `firstCat'
 	*If we're dealing with binary variables that could be zero, add one so that we have 1/2 variables
-	if r(min)==0 local numRows = r(max)+1
-	if r(min)>0 local numRows = r(max)
+	tempvar tmp1
+	if r(min)==0 gen `tmp1' = `firstCat'+1
+	summ `tmp1'
+	local numRows = r(max)
 	
+	di `secondCat'
+	summ `secondCat'
 	
-	if `numCat'==2 {
-		local secondCat = "`2'"
-		summ `secondCat'
-		if r(min)==0 local numCols = r(max) +1
-		if r(min)>0 local numCols = r(max)
-	}
-
+	*if r(min)==0 local numCols = r(max) + 1
+	*if r(min)>0 local numCols = r(max) 
+	tempvar tmp2
+	if r(min)==0 gen `tmp2' = `secondCat'+1
+	summ `tmp2'
+	local numCols = r(max)
+	
+	*display "a `N'"
+	*di "b `M'"
 	
 	*group1 and group2 are variables that range from 1...number of categories of variables `firstCat' and `firstCat'
 	tempvar group1 
@@ -61,13 +36,41 @@ program define twoByTwo
 	tempvar group2 
 	egen `group2' = group(`secondCat') if `touse'
 	
-	tab `group1'
-	tab `group2'
+	levelsof `group1', local(numG1)
+	levelsof `firstCat', local(numG1Old)
+	tokenize `numG1Old'
 	
+	levelsof `group2', local(numG2)
+	levelsof `secondCat', local(numG2Old)
+	tokenize `numG2Old'
 	
-	*Used to reassign the old labels to the new variables
-	fixBinary `group1' `firstCat' , num(1)
-	fixBinary `group2' `secondCat' , num(2)
+	local cmd1 = "lab def first"
+	local cmd2 = "lab def second"
+	foreach i of local numG1 {
+		local a : value label `firstCat'
+		local lab1 : label `a' `=`i'-1'
+		di "aaa`lab1'"
+		local cmd1 = `"`cmd1' `i' "`lab1'""'
+	}
+	foreach i of local numG2 {
+		local a : value label `secondCat'
+		local lab2 : label `a' `=`i'-1'
+		di "aaaa`lab2'"
+		local cmd2 = `"`cmd2' `i' "`lab2'""'
+	}
+	capture lab drop first
+	capture lab drop second
+	`cmd1'
+	`cmd2'
+	lab val `group1' first
+	lab val `group2' second
+		
+	local vertVar = "`group1'"
+	*di "aaaaaa"
+	di "`vertVar'"
+	local horVar = "`group2'"
+	
+	*di "`mean'" 
 	
 	*numVariables is the number of variables to take the mean of
 	local numVariables : word count `mean'
@@ -100,12 +103,12 @@ program define twoByTwo
 				matrix N[`j',`k']=r(N)
 				quietly count if `group1'==`j' & `group2'==`k'
 				matrix freq[`j', `k'] = r(N)
-				local vertValLabs : value label `group1'
-				local horValLabs : value label `group2'
+				local vertValLabs : value label `vertVar'
+				local horValLabs : value label `horVar'
 				local vertCat`j' : label `vertValLabs' `j' 
 				local horCat`k' : label `horValLabs' `k'
-				local vertVarLab : variable label `group1'
-				local horVarLab : variable label `group2'
+				local vertVarLab : variable label `vertVar'
+				local horVarLab : variable label `horVar'
 				quietly summ ``i'' if `group2'==`k' & `group2'!=.
 				matrix mean`i'[`bignumRows',`k'] = r(mean)
 				matrix N[`bignumRows',`k']=r(N)
