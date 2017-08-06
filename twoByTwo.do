@@ -121,6 +121,7 @@ program define twoByTwo
 			}
 			quietly summ ``i'' if `group2'==`j' & `group1'!=.
 			matrix mean`i'[`j', `bignumCols'] = r(mean) 
+			matrix sd`i'[`j',`bignumCols']=r(sd)
 			matrix N[`j',`bignumCols']=r(N)
 			quietly count if `group2'==`j' & `group1'!=.
 			matrix freq[`j', `bignumCols'] = r(N)			
@@ -129,6 +130,7 @@ program define twoByTwo
 		if `numRows'>1 {	
 			quietly summ ``i'' if `group2'!=. & `group1'!=.
 			matrix mean`i'[`bignumRows', `bignumCols'] = r(mean)
+			matrix sd`i'[`bignumRows',`bignumCols']=r(sd)
 			matrix N[`bignumRows',`bignumCols']=r(N)
 			quietly count if `group2'!=. & `group1'!=.
 			matrix freq[`bignumRows', `bignumCols'] = r(N)
@@ -148,17 +150,16 @@ forvalues i=1/`bignumRows' {
 	local tabBody = "`tabBody'" + "\textbf{`vertCat`i''}" 
 	
 	local stats = "mean"
-	if "`sd'" != "" { 
-		local stats = "mean sd"
+	if ("`sd'" != "" & "`freq'" != "") { 
+		local stats = "mean sd freq"
 	}
-	else if ("`sd'" != "" & "`freq'" != "") {
-		local stats = "mean sd freq" 
+	else if "`sd'" != "" {
+		local stats = "mean sd" 
 	}
 	else if "`freq'" != "" {
-		local stats = "mean sd " 
+		local stats = "mean freq" 
 	}
 
-	
 	forvalues j = 1/`numVariables' {
 		foreach stat in `stats' {
 			if "`stat'"=="mean" {
@@ -167,16 +168,22 @@ forvalues i=1/`bignumRows' {
 			else if "`stat'"=="sd" {
 				local tabBody = "`tabBody'&"
 			}
+			else if "`stat'"=="freq" {
+				local tabBody = "`tabBody'&" 
+			}
 			forvalues k = 1/`bignumCols' {
 				if "`stat'"=="mean" {
-					local tabBody = "`tabBody'&" + "`=round(`stat'`j'[`i', `k'], .001)'"
+					local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
+					local tabBody = "`tabBody'&" + substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) 
 				}
 				else if "`stat'"=="sd" {
-					local tabBody = "`tabBody'&" + "(`=round(`stat'`j'[`i', `k'], .001)')"
+					local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
+					local tabBody = "`tabBody'&" + "\footnotesize{("+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) +")}"
 				}
 				else {
 					local tabBody = "`tabBody'&" + "`=round(`stat'[`i', `k'], 1)'"
 				}
+
 			}
 			if "`stat'"=="mean" {
 				local tabBody = "`tabBody'"+ "&`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .001)'"
