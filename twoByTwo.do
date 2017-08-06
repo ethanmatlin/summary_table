@@ -23,12 +23,11 @@ program define fixBinary
 end;
 
 program define twoByTwo 
-	syntax varlist(max=2 numeric) [if] [in], mean(string) footnote(string) title(string) name(string) [sd freq firstTotal secondTotal]
+	syntax varlist(max=2 numeric) [if] [in], mean(string) title(string) name(string) label(string) [sd freq firstTotal secondTotal]
 	
 	*Note: Freq gives the number in that box (i.e. at the intersection of two categories for example the number of girls in 10th grade) whereas N gives the sample size 
 	*for computation of statistics (i.e. the intersection of the two categories with nonmissing data for the variable of interest for example the number of girls in 10th grade with 
 	*nonmissing test scores).
-	
 	
 	*=========================================
 	*Setup====================================
@@ -98,12 +97,12 @@ program define twoByTwo
 	*Loop over all the variables we want statistics of
 	forvalues i=1/`numVariables' {
 		*If not a separator
-		if "``i''"!="\hline" {
+		if "``i''"!="\hline" & "``i''"!="indent" {
 			*Create matrices for each variable of interest
 			matrix mean`i' = J(`bignumRows',`bignumCols', 1)
 			matrix sd`i' = J(`bignumRows', `bignumCols',1)
 			matrix freq = J(`bignumRows', `bignumCols', 1)
-			matrix N = J(`bignumRows',`bignumCols', 1)
+			matrix N = J(`bignumRows',`=`bignumCols'+1', 1)
 			matrix p`i' = J(`numRows',1, 1)
 			forvalues j=1/`numRows' {
 				local varLab`i' : variable label ``i''
@@ -172,6 +171,10 @@ program define twoByTwo
 					matrix freq[`j', `bignumCols'] = r(N)			
 					local horCat`bignumCols' = "Total"
 				}
+				else {
+					quietly summ ``i'' if `group2'==`j' & `group1'!=.
+					matrix N[`j',`=`numCols'+1']=r(N)
+				}
 			}	
 			*Last row (total row)
 			if `numRows'>1 & "`secondTotal'"!="" {	
@@ -219,18 +222,34 @@ program define twoByTwo
 			local stats = "mean freq" 
 		}
 
-		forvalues j = 1/`numVariables' {
+		forvalues j = 1/`numVariables' {			
+			if "``j''"=="\hline" {
+				*Otherwise, just write the separator
+				local tabBody = "`tabBody' \hline"
+			}
+			else if "``j''"=="indent" {
+			}
 			*If not a separator, write everything to appropriate location
-			if "``j''"!="\hline" {
+			else {
 				foreach stat in `stats' {
 					if "`stat'"=="mean" {
 						if `numRows'>1 {
 							local tabBody = "`tabBody'&" + "`varLab`j''"
 						}
 						else {
-							local tabBody = "`tabBody'&" + "\textbf{`varLab`j''}"
+							if `j'>1 {
+								if "```=`j'-1'''"!="indent" {
+									local tabBody = "`tabBody'&" + "\hspace{1em}\textit{`varLab`j''}"
+								}
+								else {
+									local tabBody = "`tabBody'&" + "\textbf{`varLab`j''}"
+								}
+							}
+							else {
+								local tabBody = "`tabBody'&" + "\textbf{`varLab`j''}"
+							}
 						}
-					}
+					}	
 					else if "`stat'"=="sd" {
 						local tabBody = "`tabBody'&"
 					}
@@ -240,12 +259,12 @@ program define twoByTwo
 					forvalues k = 1/`bignumCols' {
 						if "`stat'"=="mean" {
 							*Deals with the repeating 0 and repeating 9 problem
-							local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
+							local entry = "`=round(`stat'`j'[`i', `k'], .01)'"
 							local tabBody = "`tabBody'&" + substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3)
 						}
 						else if "`stat'"=="sd" {
 							*Deals with the repeating 0 and repeating 9 problem
-							local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
+							local entry = "`=round(`stat'`j'[`i', `k'], .01)'"
 							local tabBody = "`tabBody'&" + "\footnotesize{("+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) +")}"
 						}
 						else {
@@ -260,23 +279,19 @@ program define twoByTwo
 						else if (p`j'[`i',1]<.05) {
 							local stars = "**"
 						}
-						local entry = "`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .001)'"
+						local entry = "`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .01)'"
 						local tabBody = "`tabBody'&"+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) + "`stars'"
 					}
 					local tabBody = "`tabBody'"+"\\"
 				}
 			}
-			else {
-				*Otherwise, just write the separator
-				local tabBody = "`tabBody' \hline"
-			}
 		}
 		*Write sample size (outside of variables loop
-		local tabBody = "`tabBody'&" + "N"
+		local tabBody = "`tabBody'&" + "\textbf{N}"
 		forvalues k = 1/`bignumCols' {
 			local tabBody = "`tabBody'&" + "`=round(N[`i', `k'], 1)'"
 		}
-		local tabBody = "`tabBody'"+"\\"
+		local tabBody = "`tabBody'"+"&`=round(N[`i', `=`bignumCols'+1'], 1)'\\"
 	}
 
 	/*local keyText = ""
@@ -296,9 +311,8 @@ program define twoByTwo
 	`Cols' \\ \hline
 	`tabBody'
 	\hline
-	\end{tabular} 
-	\flushleft `footnote' \\"  _n
-	"\end{table}";
+	\end{tabular}  \\"  _n
+	"\label{`label'} \end{table}";
 	file close Output;
 end;
 
