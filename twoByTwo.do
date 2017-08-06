@@ -287,7 +287,12 @@ program define twoByTwo
 			}
 		}
 		*Write sample size (outside of variables loop
-		local tabBody = "`tabBody'&" + "\textbf{N}"
+		if `numRows'==1 {
+			local tabBody = "`tabBody'&" + "\textbf{N}"
+		}
+		else {
+			local tabBody = "`tabBody'&" + "N"
+		}
 		forvalues k = 1/`bignumCols' {
 			local tabBody = "`tabBody'&" + "`=round(N[`i', `k'], 1)'"
 		}
