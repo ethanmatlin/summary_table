@@ -29,6 +29,11 @@ program define twoByTwo
 	*for computation of statistics (i.e. the intersection of the two categories with nonmissing data for the variable of interest for example the number of girls in 10th grade with 
 	*nonmissing test scores).
 	
+	
+	*=========================================
+	*Setup====================================
+	*=========================================
+	
 	*Ensure Sample size>0
 	marksample touse
 	markout `touse' `by', strok
@@ -76,13 +81,19 @@ program define twoByTwo
 	if `numRows'>1 {
 			local bignumRows = `numRows'+1
 		}
-		else {
-			local bignumRows = `numRows'
-		}
+	else {
+		local bignumRows = `numRows'
+	}
+	
+	*=========================================
+	*Preparing matrices of all relevant values
+	*=========================================
 
 	*Loop over all the variables we want statistics of
 	forvalues i=1/`numVariables' {
+		*If not a separator
 		if "``i''"!="\hline" {
+			*Create matrices for each variable of interest
 			matrix mean`i' = J(`bignumRows',`bignumCols', 1)
 			matrix sd`i' = J(`bignumRows', `bignumCols',1)
 			matrix freq = J(`bignumRows', `bignumCols', 1)
@@ -121,6 +132,7 @@ program define twoByTwo
 					}
 			*}
 				}
+				*Last column (total column)
 				quietly summ ``i'' if `group2'==`j' & `group1'!=.
 				matrix mean`i'[`j', `bignumCols'] = r(mean) 
 				matrix sd`i'[`j',`bignumCols']=r(sd)
@@ -129,6 +141,7 @@ program define twoByTwo
 				matrix freq[`j', `bignumCols'] = r(N)			
 				local horCat`bignumCols' = "Total"
 			}
+			*Las row (total row)
 			if `numRows'>1 {	
 				quietly summ ``i'' if `group2'!=. & `group1'!=.
 				matrix mean`i'[`bignumRows', `bignumCols'] = r(mean)
@@ -141,96 +154,111 @@ program define twoByTwo
 		}
 	}
 
-local ccc : display _dup(`bignumCols') "c"
 
-local Cols = "&"
-forvalues i=1/`bignumCols' {
-	local Cols = "`Cols'" + "&" + "\textbf{`horCat`i''}"
-}
-local Cols = "`Cols'" + "&" + "\textbf{Difference}"
-local tabBody = ""
-forvalues i=1/`bignumRows' {
-	local tabBody = "`tabBody'" + "\textbf{`vertCat`i''}" 
-	
-	local stats = "mean"
-	if ("`sd'" != "" & "`freq'" != "") { 
-		local stats = "mean sd freq"
-	}
-	else if "`sd'" != "" {
-		local stats = "mean sd" 
-	}
-	else if "`freq'" != "" {
-		local stats = "mean freq" 
-	}
+	*===============================
+	*Preparing table body for output
+	*===============================
+		
+	local ccc : display _dup(`bignumCols') "c"
 
-	forvalues j = 1/`numVariables' {
-		if "``j''"!="\hline" {
-			foreach stat in `stats' {
-				if "`stat'"=="mean" {
-					if `numRows'>1 {
-						local tabBody = "`tabBody'&" + "`varLab`j''"
-					}
-					else {
-						local tabBody = "`tabBody'&" + "\textbf{`varLab`j''}"
-					}
-				}
-				else if "`stat'"=="sd" {
-					local tabBody = "`tabBody'&"
-				}
-				else if "`stat'"=="freq" {
-					local tabBody = "`tabBody'&" 
-				}
-				forvalues k = 1/`bignumCols' {
+	*Set up labels across top of table
+	local Cols = "&"
+	forvalues i=1/`bignumCols' {
+		local Cols = "`Cols'" + "&" + "\textbf{`horCat`i''}"
+	}
+	local Cols = "`Cols'" + "&" + "\textbf{Difference}"
+	local tabBody = ""
+	forvalues i=1/`bignumRows' {
+		*Set up category labels along left side of table
+		local tabBody = "`tabBody'" + "\textbf{`vertCat`i''}" 
+		
+		*Choose which stats to include in table given options passed in
+		local stats = "mean"
+		if ("`sd'" != "" & "`freq'" != "") { 
+			local stats = "mean sd freq"
+		}
+		else if "`sd'" != "" {
+			local stats = "mean sd" 
+		}
+		else if "`freq'" != "" {
+			local stats = "mean freq" 
+		}
+
+		forvalues j = 1/`numVariables' {
+			*If not a separator, write everything to appropriate location
+			if "``j''"!="\hline" {
+				foreach stat in `stats' {
 					if "`stat'"=="mean" {
-						local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
-						local tabBody = "`tabBody'&" + substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) 
+						if `numRows'>1 {
+							local tabBody = "`tabBody'&" + "`varLab`j''"
+						}
+						else {
+							local tabBody = "`tabBody'&" + "\textbf{`varLab`j''}"
+						}
 					}
 					else if "`stat'"=="sd" {
-						local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
-						local tabBody = "`tabBody'&" + "\footnotesize{("+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) +")}"
+						local tabBody = "`tabBody'&"
 					}
-					else {
-						local tabBody = "`tabBody'&" + "`=round(`stat'[`i', `k'], 1)'"
+					else if "`stat'"=="freq" {
+						local tabBody = "`tabBody'&" 
 					}
+					forvalues k = 1/`bignumCols' {
+						if "`stat'"=="mean" {
+							*Deals with the repeating 0 and repeating 9 problem
+							local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
+							local tabBody = "`tabBody'&" + substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) 
+						}
+						else if "`stat'"=="sd" {
+							*Deals with the repeating 0 and repeating 9 problem
+							local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
+							local tabBody = "`tabBody'&" + "\footnotesize{("+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) +")}"
+						}
+						else {
+							local tabBody = "`tabBody'&" + "`=round(`stat'[`i', `k'], 1)'"
+						}
 
+					}
+					if "`stat'"=="mean" {
+						local entry = "`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .001)'"
+						local tabBody = "`tabBody'&"+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) 
+					}
+					local tabBody = "`tabBody'"+"\\"
 				}
-				if "`stat'"=="mean" {
-					local entry = "`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .001)'"
-					local tabBody = "`tabBody'&"+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) 
-				}
-				local tabBody = "`tabBody'"+"\\"
+			}
+			else {
+				*Otherwise, just write the separator
+				local tabBody = "`tabBody' \hline"
 			}
 		}
-		else {
-			local tabBody = "`tabBody' \hline"
+		*Write sample size (outside of variables loop
+		local tabBody = "`tabBody'&" + "N"
+		forvalues k = 1/`bignumCols' {
+			local tabBody = "`tabBody'&" + "`=round(N[`i', `k'], 1)'"
 		}
+		local tabBody = "`tabBody'"+"\\"
 	}
-	local tabBody = "`tabBody'&" + "N"
-	forvalues k = 1/`bignumCols' {
-		local tabBody = "`tabBody'&" + "`=round(N[`i', `k'], 1)'"
+
+	/*local keyText = ""
+	forvalues i=1/`numVariables' {
+		local keyText = "`keyText'" + "Mean `varLab`i''" +  char(10)
 	}
-	local tabBody = "`tabBody'"+"\\"
-}
+	local keyText = "`keyText'" + "Frequency"*/
 
-local keyText = ""
-forvalues i=1/`numVariables' {
-	local keyText = "`keyText'" + "Mean `varLab`i''" +  char(10)
-}
-local keyText = "`keyText'" + "Frequency"
-
-
-#delimit ;
-file open Output using "`name'.tex", write replace;
-file write Output "\begin{table}[!htbp] \centering \caption{`title'} \medskip 
-\begin{tabular}{ll`ccc'c} \hline \hline
-`Cols' \\ \hline
-`tabBody'
-\hline
-\end{tabular} 
-\flushleft `footnote' \\"  _n
-"\end{table}";
-file close Output;
-
+	
+	*===================
+	*Write to Latex file
+	*===================
+	#delimit ;
+	file open Output using "`name'.tex", write replace;
+	file write Output "\begin{table}[!htbp] \centering \caption{`title'} \medskip 
+	\begin{tabular}{ll`ccc'c} \hline \hline
+	`Cols' \\ \hline
+	`tabBody'
+	\hline
+	\end{tabular} 
+	\flushleft `footnote' \\"  _n
+	"\end{table}";
+	file close Output;
 end;
 
 	
