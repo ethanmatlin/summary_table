@@ -92,6 +92,9 @@ program define twoByTwo
 		*local numGroups = r(max)
 		*forvalues j=1/numGroups {
 				local varLab`i' : variable label ``i''
+				if "`varLab`i''"=="" {
+					local varLab`i' = subinstr("``i''", "_", "\_", 10)
+				}
 				quietly summ ``i'' if `group2'==`j' & `group1'==`k'
 				matrix mean`i'[`j', `k'] = r(mean)
 				matrix sd`i'[`j',`k']=r(sd)
@@ -184,7 +187,8 @@ forvalues i=1/`bignumRows' {
 
 			}
 			if "`stat'"=="mean" {
-				local tabBody = "`tabBody'"+ "&`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .001)'"
+				local entry = "`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .001)'"
+				local tabBody = "`tabBody'&"+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) 
 			}
 			local tabBody = "`tabBody'"+"\\"
 		}
