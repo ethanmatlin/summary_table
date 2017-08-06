@@ -43,15 +43,18 @@ program define twoByTwo
 	local firstCat = "`1'"	
 	summ `firstCat'
 	*If we're dealing with binary variables that could be zero, add one so that we have 1/2 variables
-	if r(min)==0 local numRows = r(max)+1
-	if r(min)>0 local numRows = r(max)
+	if r(min)==0 local numCols = r(max)+1
+	if r(min)>0 local numCols = r(max)
 	
 	
 	if `numCat'==2 {
 		local secondCat = "`2'"
 		summ `secondCat'
-		if r(min)==0 local numCols = r(max) +1
-		if r(min)>0 local numCols = r(max)
+		if r(min)==0 local numRows = r(max) +1
+		if r(min)>0 local numRows = r(max)
+	}
+	else {
+		local numRows=1
 	}
 
 	
@@ -60,29 +63,32 @@ program define twoByTwo
 	egen `group1' = group(`firstCat') if `touse' 
 	tempvar group2 
 	egen `group2' = group(`secondCat') if `touse'
-	
-	tab `group1'
-	tab `group2'
-	
-	
+
 	*Used to reassign the old labels to the new variables
 	fixBinary `group1' `firstCat' , num(1)
-	fixBinary `group2' `secondCat' , num(2)
-	
+	if `numCat'==2 {
+		fixBinary `group2' `secondCat' , num(2)
+	}
 	*numVariables is the number of variables to take the mean of
 	local numVariables : word count `mean'
-	*di `numVariables'
 	
 	tokenize `mean'
-	*di "`firstCat'"
 	
 	*}	
+	
+	*need extra room for sample size and extra columns to be listed beyond M and N the number in each direction
+
+	if `numRows'>1 {
+			local bignumRows = `numRows'+1
+		}
+		else {
+			local bignumRows = `numRows'
+		}
+		
+	local bignumCols = `numCols'+1	
 
 	*Loop over all the variables we want the means of 
 	forvalues i=1/`numVariables' {
-		*need extra room for sample size and extra columns to be listed beyond M and N the number in each direction
-		local bignumRows = `numRows'+1
-		local bignumCols = `numCols'+1
 		matrix mean`i' = J(`bignumRows',`bignumCols', 1)
 		*freq is the frequency in that box
 		matrix freq = J(`bignumRows', `bignumCols', 1)
@@ -95,38 +101,46 @@ program define twoByTwo
 		*local numGroups = r(max)
 		*forvalues j=1/numGroups {
 				local varLab`i' : variable label ``i''
-				quietly summ ``i'' if `group1'==`j' & `group2'==`k'
+				quietly summ ``i'' if `group2'==`j' & `group1'==`k'
 				matrix mean`i'[`j', `k'] = r(mean)
 				matrix N[`j',`k']=r(N)
-				quietly count if `group1'==`j' & `group2'==`k'
+				quietly count if `group2'==`j' & `group1'==`k'
 				matrix freq[`j', `k'] = r(N)
-				local vertValLabs : value label `group1'
-				local horValLabs : value label `group2'
-				local vertCat`j' : label `vertValLabs' `j' 
-				local horCat`k' : label `horValLabs' `k'
-				local vertVarLab : variable label `group1'
-				local horVarLab : variable label `group2'
-				quietly summ ``i'' if `group2'==`k' & `group2'!=.
-				matrix mean`i'[`bignumRows',`k'] = r(mean)
-				matrix N[`bignumRows',`k']=r(N)
-				quietly count if `group2'==`k' & `group1'!=.
-				matrix freq[`bignumRows', `k'] = r(N)
-				local vertCat`bignumRows'="Total"
+				if `numRows'>1 {
+					local vertValLabs : value label `group2'
+					local vertCat`j' : label `vertValLabs' `j'
+					local vertVarLab : variable label `group1'
+				}
+				*if `numCols'>1 {
+					local horValLabs : value label `group1'
+					local horCat`k' : label `horValLabs' `k'
+					local horVarLab : variable label `group1'
+				*}
+				if `numRows'>1 {
+					quietly summ ``i'' if `group1'==`k' & `group2'!=.
+					matrix mean`i'[`bignumRows',`k'] = r(mean)
+					matrix N[`bignumRows',`k']=r(N)
+					quietly count if `group1'==`k' & `group2'!=.
+					matrix freq[`bignumRows', `k'] = r(N)
+					local vertCat`bignumRows'="Total"
+				}
 		*}
 			}
-			quietly summ ``i'' if `group1'==`j' & `group2'!=.
+			quietly summ ``i'' if `group2'==`j' & `group1'!=.
 			matrix mean`i'[`j', `bignumCols'] = r(mean) 
 			matrix N[`j',`bignumCols']=r(N)
-			quietly count if `group1'==`j' & `group2'!=.
+			quietly count if `group2'==`j' & `group1'!=.
 			matrix freq[`j', `bignumCols'] = r(N)			
 			local horCat`bignumCols' = "Total"
 		}
-	quietly summ ``i'' if `group1'!=. & `group2'!=.
-	matrix mean`i'[`bignumRows', `bignumCols'] = r(mean)
-	matrix N[`bignumRows',`bignumRows']=r(N)
-	quietly count if `group1'!=. & `group2'!=.
-	matrix freq[`bignumCols', `bignumRows'] = r(N)
-	matrix list mean`i'
+		if `numRows'>1 {	
+			quietly summ ``i'' if `group2'!=. & `group1'!=.
+			matrix mean`i'[`bignumRows', `bignumCols'] = r(mean)
+			matrix N[`bignumRows',`bignumCols']=r(N)
+			quietly count if `group2'!=. & `group1'!=.
+			matrix freq[`bignumRows', `bignumCols'] = r(N)
+			matrix list mean`i'
+		}
 	}
 
 local ccc : display _dup(`bignumCols') "c"
@@ -175,42 +189,9 @@ file write Output "\begin{table}[!htbp] \centering \caption{`title'} \medskip
 `tabBody'
 \hline
 \end{tabular} 
-\flushleft `footnote' \\
-Table Key: \\
-\begin{boxedverbatim}
-`keyText'
-\end{boxedverbatim} 
-\vspace{.5cm}"  _n
+\flushleft `footnote' \\"  _n
 "\end{table}";
 file close Output;
-
-
-
-/*\begin{table}[!htbp] 
-\caption{Repeaters/Non-repeaters in Government/Private Schools: Test Scores} 
-
-\centering \medskip \begin{tabular}{l*{5}{r}}
-
-& \bf{Promoted} & \bf{Not Promoted} & \bf{Total} \\
-\bf{Private} 		& 1.305   	& .830	&  1.292 \\
- 				&  2566     	&   72    		&   2638 \\
-				&97.27       	&2.73 		&100.00 \\
-\hline
- \bf{Government}  	& .701 	&  -.282 	& .593 \\
-				& 6744   		&     829   		&  7573 \\
-				&89.05      	&10.95		&100.00 \\
-\hline
-\bf{Total} 			& .867  	& -.193 	& .774 \\
-				&  9310  		&     901   		&   10211 \\
-				&91.18       	&8.82		& 100.00 \\
-\end{tabular}\\
-
-\end{table}
-*/
-/*\hline Attock & `attockMean' & `attockSD' &`attockN'  \\
-Faisalabad & `faisMean' & `faisSD' & `faisN'\\ Rahim Yar Khan & `rahimMean' & `rahimSD' &`rahimN'\\
-Total & `totalMean' & `totalSD' &`totalN' \\ \hline */
-
 
 end;
 
