@@ -23,7 +23,7 @@ program define fixBinary
 end;
 
 program define twoByTwo 
-	syntax varlist(max=2 numeric) [if] [in], mean(string) footnote(string) title(string) name(string) [sd freq]
+	syntax varlist(max=2 numeric) [if] [in], mean(string) footnote(string) title(string) name(string) [sd freq firstTotal secondTotal]
 	
 	*Note: Freq gives the number in that box (i.e. at the intersection of two categories for example the number of girls in 10th grade) whereas N gives the sample size 
 	*for computation of statistics (i.e. the intersection of the two categories with nonmissing data for the variable of interest for example the number of girls in 10th grade with 
@@ -75,20 +75,26 @@ program define twoByTwo
 	tokenize `mean'
 	
 	*Need an additional 'total column'	
-	local bignumCols = `numCols'+1	
+	if "`firstTotal'"!="" {
+		local bignumCols = `numCols'+1
+	}
+	else {
+		local bignumCols = `numCols'
+	}
 	
 	*If there's a second variable, need an additional 'total' row.
-	if `numRows'>1 {
-			local bignumRows = `numRows'+1
-		}
+	if `numRows' > 1 & "`secondTotal'"!="" {
+		local bignumRows = `numRows'+1
+	}
 	else {
 		local bignumRows = `numRows'
 	}
 	
+	
 	*=========================================
 	*Preparing matrices of all relevant values
 	*=========================================
-
+	
 	*Loop over all the variables we want statistics of
 	forvalues i=1/`numVariables' {
 		*If not a separator
@@ -98,61 +104,88 @@ program define twoByTwo
 			matrix sd`i' = J(`bignumRows', `bignumCols',1)
 			matrix freq = J(`bignumRows', `bignumCols', 1)
 			matrix N = J(`bignumRows',`bignumCols', 1)
+			matrix p`i' = J(`numRows',1, 1)
 			forvalues j=1/`numRows' {
-				forvalues k=1/`numCols' {
-			*sum `group'
-			*local numGroups = r(max)
-			*forvalues j=1/numGroups {
-					local varLab`i' : variable label ``i''
-					if "`varLab`i''"=="" {
-						local varLab`i' = subinstr("``i''", "_", "\_", 10)
+				local varLab`i' : variable label ``i''
+				if "`varLab`i''"=="" {
+					local varLab`i' = subinstr("``i''", "_", "\_", 10)
+				}
+				if `numCols'==2 {
+					quietly ttest ``i'' if `group2'==`j', by (`group1')
+					matrix mean`i'[`j', 1] = r(mu_1)
+					matrix mean`i'[`j', 2] = r(mu_2)
+					matrix sd`i'[`j',1]=r(sd_1)
+					matrix sd`i'[`j',2]=r(sd_2)
+					matrix N[`j',1]=r(N_1)
+					matrix N[`j',2]=r(N_2)
+					matrix p`i'[`j',1]=r(p)
+					if `numRows'>1 {
+						quietly ttest ``i'' if `group2'==`j', by (`group1')
+						matrix mean`i'[`j', 1] = r(mu_1)
+						matrix mean`i'[`j', 2] = r(mu_2)
+						matrix sd`i'[`j',1]=r(sd_1)
+						matrix sd`i'[`j',2]=r(sd_2)
+						matrix N[`j',1]=r(N_1)
+						matrix N[`j',2]=r(N_2)
+						matrix p`i'[`j',1]=r(p)
+						if `bignumRows'!=`numRows' {
+							local vertCat`bignumRows'="Total"
+						}
 					}
-					quietly summ ``i'' if `group2'==`j' & `group1'==`k'
-					matrix mean`i'[`j', `k'] = r(mean)
-					matrix sd`i'[`j',`k']=r(sd)
-					matrix N[`j',`k']=r(N)
+				}
+				else {
+					forvalues k=1/`numCols' {
+						quietly summ ``i'' if `group2'==`j' & `group1'==`k'
+						matrix mean`i'[`j', `k'] = r(mean)
+						matrix sd`i'[`j',`k']=r(sd)
+						matrix N[`j',`k']=r(N)
+					}
+				}
+				forvalues k=1/`numCols' {
 					quietly count if `group2'==`j' & `group1'==`k'
 					matrix freq[`j', `k'] = r(N)
-					if `numRows'>1 {
-						local vertValLabs : value label `group2'
-						local vertCat`j' : label `vertValLabs' `j'
-						local vertVarLab : variable label `group1'
-					}
-					local horValLabs : value label `group1'
-					local horCat`k' : label `horValLabs' `k'
-					local horVarLab : variable label `group1'
-					if `numRows'>1 {
-						quietly summ ``i'' if `group1'==`k' & `group2'!=.
-						matrix mean`i'[`bignumRows',`k'] = r(mean)
-						matrix sd`i'[`bignumRows',`k']=r(sd)
-						matrix N[`bignumRows',`k']=r(N)
-						quietly count if `group1'==`k' & `group2'!=.
-						matrix freq[`bignumRows', `k'] = r(N)
-						local vertCat`bignumRows'="Total"
-					}
-			*}
+						if `numRows'>1 {
+							local vertValLabs : value label `group2'
+							local vertCat`j' : label `vertValLabs' `j'
+							local vertVarLab : variable label `group1'
+						}
+						local horValLabs : value label `group1'
+						local horCat`k' : label `horValLabs' `k'
+						local horVarLab : variable label `group1'
+						if `numRows'>1 & "`secondTotal'"!="" {
+							quietly summ ``i'' if `group1'==`k' & `group2'!=.
+							matrix mean`i'[`bignumRows',`k'] = r(mean)
+							matrix sd`i'[`bignumRows',`k']=r(sd)
+							matrix N[`bignumRows',`k']=r(N)
+							quietly count if `group1'==`k' & `group2'!=.
+							matrix freq[`bignumRows', `k'] = r(N)
+							local vertCat`bignumRows'="Total"
+						}
 				}
-				*Last column (total column)
-				quietly summ ``i'' if `group2'==`j' & `group1'!=.
-				matrix mean`i'[`j', `bignumCols'] = r(mean) 
-				matrix sd`i'[`j',`bignumCols']=r(sd)
-				matrix N[`j',`bignumCols']=r(N)
-				quietly count if `group2'==`j' & `group1'!=.
-				matrix freq[`j', `bignumCols'] = r(N)			
-				local horCat`bignumCols' = "Total"
-			}
-			*Las row (total row)
-			if `numRows'>1 {	
+				if "`firstTotal'"!="" {
+					*Last column (total column)
+					quietly summ ``i'' if `group2'==`j' & `group1'!=.
+					matrix mean`i'[`j', `bignumCols'] = r(mean) 
+					matrix sd`i'[`j',`bignumCols']=r(sd)
+					matrix N[`j',`bignumCols']=r(N)
+					quietly count if `group2'==`j' & `group1'!=.
+					matrix freq[`j', `bignumCols'] = r(N)			
+					local horCat`bignumCols' = "Total"
+				}
+			}	
+			*Last row (total row)
+			if `numRows'>1 & "`secondTotal'"!="" {	
 				quietly summ ``i'' if `group2'!=. & `group1'!=.
 				matrix mean`i'[`bignumRows', `bignumCols'] = r(mean)
 				matrix sd`i'[`bignumRows',`bignumCols']=r(sd)
 				matrix N[`bignumRows',`bignumCols']=r(N)
 				quietly count if `group2'!=. & `group1'!=.
 				matrix freq[`bignumRows', `bignumCols'] = r(N)
-				matrix list mean`i'
-			}
+			}	
+			matrix list mean`i'
 		}
 	}
+	
 
 
 	*===============================
@@ -168,7 +201,9 @@ program define twoByTwo
 	}
 	local Cols = "`Cols'" + "&" + "\textbf{Difference}"
 	local tabBody = ""
+	local count = 0 
 	forvalues i=1/`bignumRows' {
+		local count = `count'+1
 		*Set up category labels along left side of table
 		local tabBody = "`tabBody'" + "\textbf{`vertCat`i''}" 
 		
@@ -206,7 +241,7 @@ program define twoByTwo
 						if "`stat'"=="mean" {
 							*Deals with the repeating 0 and repeating 9 problem
 							local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
-							local tabBody = "`tabBody'&" + substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) 
+							local tabBody = "`tabBody'&" + substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3)
 						}
 						else if "`stat'"=="sd" {
 							*Deals with the repeating 0 and repeating 9 problem
@@ -219,8 +254,14 @@ program define twoByTwo
 
 					}
 					if "`stat'"=="mean" {
+						if (p`j'[`i',1]<.01) {
+							local stars = "***"
+						}
+						else if (p`j'[`i',1]<.05) {
+							local stars = "**"
+						}
 						local entry = "`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .001)'"
-						local tabBody = "`tabBody'&"+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) 
+						local tabBody = "`tabBody'&"+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) + "`stars'"
 					}
 					local tabBody = "`tabBody'"+"\\"
 				}
