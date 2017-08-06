@@ -1,7 +1,3 @@
-*program define fixBinary, rclass
-*	return numCols, numRows, firstCat, secondCat
-*end;
-
 program define fixBinary
 	syntax varlist(max=2 min=2 numeric) [if] [in], num(real)
 	
@@ -27,10 +23,10 @@ program define fixBinary
 end;
 
 program define twoByTwo 
-	syntax varlist(max=2 numeric) [if] [in], mean(varlist) footnote(string) title(string) name(string)
+	syntax varlist(max=2 numeric) [if] [in], mean(varlist) footnote(string) title(string) name(string) [sd freq]
+	
 	
 	*Check the sample and make sure it's not N=0
-	*quietly {
 	marksample touse
 	markout `touse' `by', strok
 	count if `touse'
@@ -74,10 +70,7 @@ program define twoByTwo
 	
 	tokenize `mean'
 	
-	*}	
-	
-	*need extra room for sample size and extra columns to be listed beyond M and N the number in each direction
-
+	*Need extra room for sample size and extra columns to be listed beyond M and N the number in each direction
 	if `numRows'>1 {
 			local bignumRows = `numRows'+1
 		}
@@ -90,6 +83,7 @@ program define twoByTwo
 	*Loop over all the variables we want the means of 
 	forvalues i=1/`numVariables' {
 		matrix mean`i' = J(`bignumRows',`bignumCols', 1)
+		matrix sd`i' = J(`bignumRows', `bignumCols',1)
 		*freq is the frequency in that box
 		matrix freq = J(`bignumRows', `bignumCols', 1)
 		*CHANGE DIFFERENCE: the numCols Matrix will take sample size for the calculation of the LAST mean. see below
@@ -103,6 +97,7 @@ program define twoByTwo
 				local varLab`i' : variable label ``i''
 				quietly summ ``i'' if `group2'==`j' & `group1'==`k'
 				matrix mean`i'[`j', `k'] = r(mean)
+				matrix sd`i'[`j',`k']=r(sd)
 				matrix N[`j',`k']=r(N)
 				quietly count if `group2'==`j' & `group1'==`k'
 				matrix freq[`j', `k'] = r(N)
@@ -111,11 +106,9 @@ program define twoByTwo
 					local vertCat`j' : label `vertValLabs' `j'
 					local vertVarLab : variable label `group1'
 				}
-				*if `numCols'>1 {
-					local horValLabs : value label `group1'
-					local horCat`k' : label `horValLabs' `k'
-					local horVarLab : variable label `group1'
-				*}
+				local horValLabs : value label `group1'
+				local horCat`k' : label `horValLabs' `k'
+				local horVarLab : variable label `group1'
 				if `numRows'>1 {
 					quietly summ ``i'' if `group1'==`k' & `group2'!=.
 					matrix mean`i'[`bignumRows',`k'] = r(mean)
@@ -152,30 +145,54 @@ forvalues i=1/`bignumCols' {
 local Cols = "`Cols'" + "&" + "\textbf{Difference}"
 local tabBody = ""
 forvalues i=1/`bignumRows' {
-	local iminus = `i'-1
 	local tabBody = "`tabBody'" + "\textbf{`vertCat`i''}" 
+	
+	local stats = "mean"
+	if "`sd'" != "" { 
+		local stats = "mean sd"
+	}
+	else if ("`sd'" != "" & "`freq'" != "") {
+		local stats = "mean sd freq" 
+	}
+	else if "`freq'" != "" {
+		local stats = "mean sd " 
+	}
+
+	
 	forvalues j = 1/`numVariables' {
-		local tabBody = "`tabBody'&" + "Mean `varLab`j''"
-		forvalues k = 1/`bignumCols' {
-			local tabBody = "`tabBody'&" + "`=round(mean`j'[`i', `k'], .001)'"
+		foreach stat in `stats' {
+			if "`stat'"=="mean" {
+				local tabBody = "`tabBody'&" + "`varLab`j''"
+			}
+			else if "`stat'"=="sd" {
+				local tabBody = "`tabBody'&"
+			}
+			forvalues k = 1/`bignumCols' {
+				if "`stat'"=="mean" {
+					local tabBody = "`tabBody'&" + "`=round(`stat'`j'[`i', `k'], .001)'"
+				}
+				else if "`stat'"=="sd" {
+					local tabBody = "`tabBody'&" + "(`=round(`stat'`j'[`i', `k'], .001)')"
+				}
+				else {
+					local tabBody = "`tabBody'&" + "`=round(`stat'[`i', `k'], 1)'"
+				}
+			}
+			if "`stat'"=="mean" {
+				local tabBody = "`tabBody'"+ "&`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .001)'"
+			}
+			local tabBody = "`tabBody'"+"\\"
 		}
-	local tabBody = "`tabBody'"+ "&`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .001)'"
+	}
+	local tabBody = "`tabBody'&" + "N"
+	forvalues k = 1/`bignumCols' {
+		local tabBody = "`tabBody'&" + "`=round(N[`i', `k'], 1)'"
+	}
 	local tabBody = "`tabBody'"+"\\"
-	}
-	local tabBody = "`tabBody'"+"&N"
-	forvalues k = 1/`bignumCols' {
-		local tabBody = "`tabBody'" + "&`=N[`i', `k']'"	
-	}
-	local tabBody = "`tabBody'"+"\\&Frequency"
-	forvalues k = 1/`bignumCols' {
-		local tabBody = "`tabBody'" + "&`=freq[`i', `k']'"	
-	}
-	local tabBody = "`tabBody'"+"\\\\"
 }
 
 local keyText = ""
 forvalues i=1/`numVariables' {
-	*di "f"
 	local keyText = "`keyText'" + "Mean `varLab`i''" +  char(10)
 }
 local keyText = "`keyText'" + "Frequency"
