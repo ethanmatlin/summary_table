@@ -23,7 +23,7 @@ program define fixBinary
 end;
 
 program define twoByTwo 
-	syntax varlist(max=2 numeric) [if] [in], mean(varlist) footnote(string) title(string) name(string) [sd freq]
+	syntax varlist(max=2 numeric) [if] [in], mean(string) footnote(string) title(string) name(string) [sd freq]
 	
 	*Note: Freq gives the number in that box (i.e. at the intersection of two categories for example the number of girls in 10th grade) whereas N gives the sample size 
 	*for computation of statistics (i.e. the intersection of the two categories with nonmissing data for the variable of interest for example the number of girls in 10th grade with 
@@ -82,60 +82,62 @@ program define twoByTwo
 
 	*Loop over all the variables we want statistics of
 	forvalues i=1/`numVariables' {
-		matrix mean`i' = J(`bignumRows',`bignumCols', 1)
-		matrix sd`i' = J(`bignumRows', `bignumCols',1)
-		matrix freq = J(`bignumRows', `bignumCols', 1)
-		matrix N = J(`bignumRows',`bignumCols', 1)
-		forvalues j=1/`numRows' {
-			forvalues k=1/`numCols' {
-		*sum `group'
-		*local numGroups = r(max)
-		*forvalues j=1/numGroups {
-				local varLab`i' : variable label ``i''
-				if "`varLab`i''"=="" {
-					local varLab`i' = subinstr("``i''", "_", "\_", 10)
+		if "``i''"!="\hline" {
+			matrix mean`i' = J(`bignumRows',`bignumCols', 1)
+			matrix sd`i' = J(`bignumRows', `bignumCols',1)
+			matrix freq = J(`bignumRows', `bignumCols', 1)
+			matrix N = J(`bignumRows',`bignumCols', 1)
+			forvalues j=1/`numRows' {
+				forvalues k=1/`numCols' {
+			*sum `group'
+			*local numGroups = r(max)
+			*forvalues j=1/numGroups {
+					local varLab`i' : variable label ``i''
+					if "`varLab`i''"=="" {
+						local varLab`i' = subinstr("``i''", "_", "\_", 10)
+					}
+					quietly summ ``i'' if `group2'==`j' & `group1'==`k'
+					matrix mean`i'[`j', `k'] = r(mean)
+					matrix sd`i'[`j',`k']=r(sd)
+					matrix N[`j',`k']=r(N)
+					quietly count if `group2'==`j' & `group1'==`k'
+					matrix freq[`j', `k'] = r(N)
+					if `numRows'>1 {
+						local vertValLabs : value label `group2'
+						local vertCat`j' : label `vertValLabs' `j'
+						local vertVarLab : variable label `group1'
+					}
+					local horValLabs : value label `group1'
+					local horCat`k' : label `horValLabs' `k'
+					local horVarLab : variable label `group1'
+					if `numRows'>1 {
+						quietly summ ``i'' if `group1'==`k' & `group2'!=.
+						matrix mean`i'[`bignumRows',`k'] = r(mean)
+						matrix sd`i'[`bignumRows',`k']=r(sd)
+						matrix N[`bignumRows',`k']=r(N)
+						quietly count if `group1'==`k' & `group2'!=.
+						matrix freq[`bignumRows', `k'] = r(N)
+						local vertCat`bignumRows'="Total"
+					}
+			*}
 				}
-				quietly summ ``i'' if `group2'==`j' & `group1'==`k'
-				matrix mean`i'[`j', `k'] = r(mean)
-				matrix sd`i'[`j',`k']=r(sd)
-				matrix N[`j',`k']=r(N)
-				quietly count if `group2'==`j' & `group1'==`k'
-				matrix freq[`j', `k'] = r(N)
-				if `numRows'>1 {
-					local vertValLabs : value label `group2'
-					local vertCat`j' : label `vertValLabs' `j'
-					local vertVarLab : variable label `group1'
-				}
-				local horValLabs : value label `group1'
-				local horCat`k' : label `horValLabs' `k'
-				local horVarLab : variable label `group1'
-				if `numRows'>1 {
-					quietly summ ``i'' if `group1'==`k' & `group2'!=.
-					matrix mean`i'[`bignumRows',`k'] = r(mean)
-					matrix sd`i'[`bignumRows',`k']=r(sd)
-					matrix N[`bignumRows',`k']=r(N)
-					quietly count if `group1'==`k' & `group2'!=.
-					matrix freq[`bignumRows', `k'] = r(N)
-					local vertCat`bignumRows'="Total"
-				}
-		*}
+				quietly summ ``i'' if `group2'==`j' & `group1'!=.
+				matrix mean`i'[`j', `bignumCols'] = r(mean) 
+				matrix sd`i'[`j',`bignumCols']=r(sd)
+				matrix N[`j',`bignumCols']=r(N)
+				quietly count if `group2'==`j' & `group1'!=.
+				matrix freq[`j', `bignumCols'] = r(N)			
+				local horCat`bignumCols' = "Total"
 			}
-			quietly summ ``i'' if `group2'==`j' & `group1'!=.
-			matrix mean`i'[`j', `bignumCols'] = r(mean) 
-			matrix sd`i'[`j',`bignumCols']=r(sd)
-			matrix N[`j',`bignumCols']=r(N)
-			quietly count if `group2'==`j' & `group1'!=.
-			matrix freq[`j', `bignumCols'] = r(N)			
-			local horCat`bignumCols' = "Total"
-		}
-		if `numRows'>1 {	
-			quietly summ ``i'' if `group2'!=. & `group1'!=.
-			matrix mean`i'[`bignumRows', `bignumCols'] = r(mean)
-			matrix sd`i'[`bignumRows',`bignumCols']=r(sd)
-			matrix N[`bignumRows',`bignumCols']=r(N)
-			quietly count if `group2'!=. & `group1'!=.
-			matrix freq[`bignumRows', `bignumCols'] = r(N)
-			matrix list mean`i'
+			if `numRows'>1 {	
+				quietly summ ``i'' if `group2'!=. & `group1'!=.
+				matrix mean`i'[`bignumRows', `bignumCols'] = r(mean)
+				matrix sd`i'[`bignumRows',`bignumCols']=r(sd)
+				matrix N[`bignumRows',`bignumCols']=r(N)
+				quietly count if `group2'!=. & `group1'!=.
+				matrix freq[`bignumRows', `bignumCols'] = r(N)
+				matrix list mean`i'
+			}
 		}
 	}
 
@@ -162,35 +164,45 @@ forvalues i=1/`bignumRows' {
 	}
 
 	forvalues j = 1/`numVariables' {
-		foreach stat in `stats' {
-			if "`stat'"=="mean" {
-				local tabBody = "`tabBody'&" + "`varLab`j''"
-			}
-			else if "`stat'"=="sd" {
-				local tabBody = "`tabBody'&"
-			}
-			else if "`stat'"=="freq" {
-				local tabBody = "`tabBody'&" 
-			}
-			forvalues k = 1/`bignumCols' {
+		if "``j''"!="\hline" {
+			foreach stat in `stats' {
 				if "`stat'"=="mean" {
-					local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
-					local tabBody = "`tabBody'&" + substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) 
+					if `numRows'>1 {
+						local tabBody = "`tabBody'&" + "`varLab`j''"
+					}
+					else {
+						local tabBody = "`tabBody'&" + "\textbf{`varLab`j''}"
+					}
 				}
 				else if "`stat'"=="sd" {
-					local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
-					local tabBody = "`tabBody'&" + "\footnotesize{("+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) +")}"
+					local tabBody = "`tabBody'&"
 				}
-				else {
-					local tabBody = "`tabBody'&" + "`=round(`stat'[`i', `k'], 1)'"
+				else if "`stat'"=="freq" {
+					local tabBody = "`tabBody'&" 
 				}
+				forvalues k = 1/`bignumCols' {
+					if "`stat'"=="mean" {
+						local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
+						local tabBody = "`tabBody'&" + substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) 
+					}
+					else if "`stat'"=="sd" {
+						local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
+						local tabBody = "`tabBody'&" + "\footnotesize{("+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) +")}"
+					}
+					else {
+						local tabBody = "`tabBody'&" + "`=round(`stat'[`i', `k'], 1)'"
+					}
 
+				}
+				if "`stat'"=="mean" {
+					local entry = "`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .001)'"
+					local tabBody = "`tabBody'&"+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) 
+				}
+				local tabBody = "`tabBody'"+"\\"
 			}
-			if "`stat'"=="mean" {
-				local entry = "`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .001)'"
-				local tabBody = "`tabBody'&"+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) 
-			}
-			local tabBody = "`tabBody'"+"\\"
+		}
+		else {
+			local tabBody = "`tabBody' \hline"
 		}
 	}
 	local tabBody = "`tabBody'&" + "N"
