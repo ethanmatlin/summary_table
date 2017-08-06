@@ -259,12 +259,12 @@ program define twoByTwo
 					forvalues k = 1/`bignumCols' {
 						if "`stat'"=="mean" {
 							*Deals with the repeating 0 and repeating 9 problem
-							local entry = "`=round(`stat'`j'[`i', `k'], .01)'"
+							local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
 							local tabBody = "`tabBody'&" + substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3)
 						}
 						else if "`stat'"=="sd" {
 							*Deals with the repeating 0 and repeating 9 problem
-							local entry = "`=round(`stat'`j'[`i', `k'], .01)'"
+							local entry = "`=round(`stat'`j'[`i', `k'], .001)'"
 							local tabBody = "`tabBody'&" + "\footnotesize{("+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) +")}"
 						}
 						else {
@@ -279,7 +279,7 @@ program define twoByTwo
 						else if (p`j'[`i',1]<.05) {
 							local stars = "**"
 						}
-						local entry = "`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .01)'"
+						local entry = "`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .001)'"
 						local tabBody = "`tabBody'&"+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) + "`stars'"
 					}
 					local tabBody = "`tabBody'"+"\\"
