@@ -238,7 +238,9 @@ program define twoByTwo
 						}
 						else {
 							if `j'>1 {
-								if "```=`j'-1'''"!="indent" {
+							di "a"
+							di "``=`j'-1''"		
+								if "``=`j'-1''"	=="indent" {
 									local tabBody = "`tabBody'&" + "\hspace{1em}\textit{`varLab`j''}"
 								}
 								else {
@@ -298,7 +300,21 @@ program define twoByTwo
 		}
 		local tabBody = "`tabBody'"+"&`=round(N[`i', `=`bignumCols'+1'], 1)'\\"
 	}
-
+	/*forvalues j = 1/`numVariables' {		
+		forvalues k = 1/`bignumCols' {
+		*****RUN ALL THE T-TESTS AGAIN THE OTHER WAY
+		
+			if (p`j'[`i',1]<.01) {
+							local stars = "***"
+						}
+						else if (p`j'[`i',1]<.05) {
+							local stars = "**"
+						}
+						local entry = "`=round(mean`j'[`i', 2] - mean`j'[`i', 1] , .001)'"
+						local tabBody = "`tabBody'&"+ substr("`entry'",1,strpos("`entry'", "."))+substr("`entry'", strpos("`entry'",".")+1,3) + "`stars'"
+					}
+					local tabBody = "`tabBody'"+"\\"
+*/
 	/*local keyText = ""
 	forvalues i=1/`numVariables' {
 		local keyText = "`keyText'" + "Mean `varLab`i''" +  char(10)
@@ -311,7 +327,7 @@ program define twoByTwo
 	*===================
 	#delimit ;
 	file open Output using "`name'.tex", write replace;
-	file write Output "\begin{table}[!htbp] \centering \caption{`title'} \medskip 
+	file write Output "\begin{table}[H] \centering \caption{`title'} \medskip 
 	\begin{tabular}{ll`ccc'c} \hline \hline
 	`Cols' \\ \hline
 	`tabBody'
